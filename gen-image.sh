@@ -49,12 +49,11 @@ else
 	echo "Done."
 fi
 
-IMG_URL=`cat $TOUT | grep https | sed s/.*url\"\:\ \"//`; IMG_URL=${IMG_URL%?}
 # bit kludgy - sed removes the leading double quote and %? removes the trailing
 # one. curl will barf if you pass it a IMG_URL in double quotes via bash var.
+IMG_URL=`cat $TOUT | grep https | sed s/.*url\"\:\ \"//`; IMG_URL=${IMG_URL%?}
 
-TRIM=`echo $PROMPT | cut -c -32` # for reasonable length filenames
-FNAME=`echo $TRIM | sed 's/[^a-zA-Z0-9]/_/g'`
+FNAME=`echo $PROMPT | cut -c -32 | sed 's/[^a-zA-Z0-9]/_/g'`
 echo -en "Downloading image... "
 curl $IMG_URL --output ${TS}_${FNAME}.png 2>> $LOUT
 if [ "Z$?" != "Z0" ]; then
