@@ -1,18 +1,26 @@
 #!/bin/bash
 
 SPATH="./.secret.sh"
-
 OAI_URL="https://api.openai.com/v1/images/generations"
+#MODEL="gpt-4.1-mini"
+MODEL="gpt-image-1"
 MODEL="dall-e-3"
+#SIZE="1024x1792"
 SIZE="1024x1024"
+IMG_DIR="./img"
+JSON_DIR="./json"
+
+# TODO 
+# - add optional CLI parameters for all of these ^
 
 if [ -r $SPATH ]; then . $SPATH
-else echo "ERROR: API key file not found."; exit 99
+else echo "ERROR: Path to API key file not found."; exit 99
 fi
 if [ "Z$API_KEY" = "Z" ]; then echo "ERROR: API key not found in file."; exit 98
 fi
 
-DEBUG=0 # DEBUG outputs 
+DEBUG=1 # DEBUG outputs 
+DEBUG=0 # or don't
 if [ "Z$DEBUG" = "Z1" ]; then
 	echo -en "\nAPI KEY: $API_KEY\n"
 	echo -en "OpenAI URL: $OAI_URL\n"
@@ -21,14 +29,34 @@ fi
 
 echo -en "\nThis program accepts prompts and returns images from OpenAI, along with a record of the exchange in a json file. Files are timestamped based on the initial prompt submission.\n"
 
+COUNT=1; isnum='^[0-9]+$'
+
 while :
 do
-echo -en "\nCTRL-C to exit. Enter a prompt: "
-read PROMPT
+let COUNT--
+# echo "C1 $COUNT" # DEBUG
+if [ "Z$COUNT" = "Z0" ]; then
+	echo -en "\nCTRL-C to exit. Hit enter to run the previous prompt again, or enter a prompt: "
+	read INPUT
+	if [ "Z$INPUT" != "Z" ]; then
+		PROMPT=$INPUT
+	else
+		echo -en "Reusing the previous prompt. "
+	fi
 
-echo -en "\nReview prompt before submission:\n\n\t$PROMPT\n\nGenerate image? [Y/n]? "
-read confirm
-if [ "Z$confirm" != "Z" ] && [ "Z$confirm" = "n" ]; then exit 2; fi
+	echo -en "\nHow many images do you want? "
+	read COUNT
+	if [ "Z$COUNT" = "Z" ]; then COUNT=1
+	elif ! [[ $COUNT =~ $isnum ]]; then COUNT=1
+	fi
+# echo "C2 $COUNT" # DEBUG
+
+	echo -en "\nReview prompt before submission:\n\n\t$PROMPT\n\nGenerate image? [Y/n]? "
+	read confirm
+	if [ "Z$confirm" != "Z" ] && [ "Z$confirm" = "n" ]; then exit 2; fi
+else
+	echo -en "Remaining images to generate: $COUNT. "
+fi
 
 TS=`date +%s`; LOUT=$TS.log; TOUT=$TS.tmp; FOUT=$TS.json
 
@@ -40,7 +68,7 @@ curl $OAI_URL \
     "model": "'"$MODEL"'",
     "prompt": "'"$PROMPT"'",
     "n": 1,
-    "size": "1024x1024"
+    "size": "'"$SIZE"'"
   }' \
   --output $TOUT 2>> $LOUT
 if [ "Z$?" != "Z0" ]; then
@@ -64,6 +92,7 @@ fi
 file_info=`ls -D '%s' -l ${TS}_${FNAME}.png`
 FSIZE=`echo $file_info | cut -d " " -f 5`
 FTS=`echo $file_info | cut -d " " -f 6`
+# again a bit kludgy - after this, $FNAME includes $TS, the timestamp 
 FNAME=`echo $file_info | cut -d " " -f 7`
 
 if [ "Z$DEBUG" = "Z1" ]; then
@@ -96,5 +125,9 @@ echo -en "      \"filename\": \"$FNAME\",\n\
 echo -en "\n\n  --== JSON Output ==--\n\n"
 cat $FOUT
 rm $TOUT $LOUT
+
+# Attempt to move files to their respective dirs, leave them where they are if there's any problem
+mv $FOUT $JSON_DIR
+mv $FNAME $IMG_DIR
 
 done
